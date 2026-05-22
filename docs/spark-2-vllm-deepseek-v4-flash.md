@@ -813,6 +813,49 @@ print("[ok] added ~/.tilelang and ~/.nv to mounted cache dirs")
 print("PATCH COMPLETE")
 ```
 
+#### perf-decay-log.sh
+```
+#!/bin/bash
+# perf-decay-log.sh — OPTIMIZATION.md 레버 E: 가동시간에 따른 성능 열화 곡선 기록.
+# node1 cron이 주기 실행. 매 호출마다 pp2048/tg128 벤치 1세트(3회 평균)를 돌리고,
+# 컨테이너 가동시간 + 벤치 중 GPU 최대 SM클럭/온도를 한 줄로 누적 로그한다.
+# 로그: /home/dhlee/tools/perf-decay.log  (공백 구분 key=value, 분석은 미래 세션이 수행)
+set -u
+LOG=/home/dhlee/tools/perf-decay.log
+BENCHY=/home/dhlee/tools/llama-benchy/bin/llama-benchy
+MODEL_DIR=/home/dhlee/models/DeepSeek-V4-Flash
+TS=$(date -Iseconds)
+
+# 컨테이너 가동시간(초)
+STARTED=$(docker inspect -f '{{.State.StartedAt}}' vllm_deepseek_v4_flash 2>/dev/null)
+if [ -n "$STARTED" ]; then
+  UP=$(( $(date +%s) - $(date -d "$STARTED" +%s) ))
+else
+  UP=NA
+fi
+
+# 벤치 동안 GPU 샘플링(1초 간격, 백그라운드)
+SMPF=$(mktemp)
+( for _ in $(seq 1 240); do
+    nvidia-smi --query-gpu=temperature.gpu,clocks.sm --format=csv,noheader,nounits 2>/dev/null | head -1
+    sleep 1
+  done ) > "$SMPF" &
+SMPID=$!
+
+OUT=$("$BENCHY" --base-url http://localhost:8000/v1 --model deepseek-v4-flash \
+      --tokenizer "$MODEL_DIR" --pp 2048 --tg 128 --depth 0 --runs 3 --no-cache 2>/dev/null)
+
+kill "$SMPID" 2>/dev/null
+
+PP=$(echo "$OUT" | grep -E '\| *pp2048' | sed 's/|/ /g' | awk '{print $3}')
+TG=$(echo "$OUT" | grep -E '\| *tg128'  | sed 's/|/ /g' | awk '{print $3}')
+MAXCLK=$(awk -F', *' 'NF>=2{print $2}' "$SMPF" | sort -n | tail -1)
+MAXTMP=$(awk -F', *' 'NF>=2{print $1}' "$SMPF" | sort -n | tail -1)
+rm -f "$SMPF"
+
+echo "$TS uptime_s=${UP} pp2048=${PP:-NA} tg128=${TG:-NA} max_sm_clk=${MAXCLK:-NA} max_temp=${MAXTMP:-NA}" >> "$LOG"
+
+```
 
 ---
 
