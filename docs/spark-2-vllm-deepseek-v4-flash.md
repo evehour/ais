@@ -49,7 +49,8 @@
 https://www.gigabyte.com/kr/AI-TOP-PC/GIGABYTE-AI-TOP-ATOM/support
 1. `AI TOP ATOM SOC/EC/PD Firmware - 2.144.9` 수행 함
 2. `GIGABYTE AI TOP Utility 4.2.1: AI TOP ATOM Support Ubuntu 24.04.4 with Linux Kernel 6.17-1008-nvidia` 설치 후 초기 구동 함
-3. `NVIDIA Dashboard`에서 업데이트 수행 함
+   - 이거 하고나니까 conda가 .bashrc에 등록되서 실행되서 좀 편했음
+4. `NVIDIA Dashboard`에서 업데이트 수행 함
 
 ---
 
